@@ -637,8 +637,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)" />
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
-<title>遥遥资讯</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23ff6a00'/%3E%3Ctext x='50' y='72' font-size='60' font-family='PingFang SC,Arial' font-weight='700' fill='white' text-anchor='middle'%3E遥%3C/text%3E%3C/svg%3E" />
+<title>丫丫资讯</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23ff6a00'/%3E%3Ctext x='50' y='72' font-size='60' font-family='PingFang SC,Arial' font-weight='700' fill='white' text-anchor='middle'%3E丫%3C/text%3E%3C/svg%3E" />
 <style>
   :root{
     --bg:#f2f2f7; --card:#ffffff; --text:#1c1c1e; --sub:#8e8e93;
@@ -779,7 +779,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 <body>
   <div class="nav">
     <div class="nav-in">
-      <div class="nav-title">遥遥资讯</div>
+      <div class="nav-title">丫丫资讯</div>
       <div class="nav-right">
         <div class="nav-up"><span class="dot"></span><span id="upd">更新中…</span></div>
       </div>
@@ -809,7 +809,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     <div id="feed"></div>
 
     <footer>
-      由遥遥科技团队运营<br/>
+      由丫丫科技团队运营<br/>
       <span class="foot-sub">于信息洪流中，为你留住值得凝视的微光 · 每天一分钟，与世界同步思考</span>
     </footer>
   </div>

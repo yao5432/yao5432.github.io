@@ -1,6 +1,6 @@
-# 遥遥资讯 · iOS 风格自动更新网站
+# 丫丫资讯 · iOS 风格自动更新网站
 
-一个**纯静态、零成本、每日自动更新**的资讯聚合站（遥遥资讯）。整体采用 iOS 设计语言（毛玻璃导航、分段控制器、圆角卡片、明暗双主题），数据由 GitHub Actions 每天定时抓取并重新生成，托管在 GitHub Pages 上即可长期自动运行。
+一个**纯静态、零成本、每日自动更新**的资讯聚合站（丫丫资讯）。整体采用 iOS 设计语言（毛玻璃导航、分段控制器、圆角卡片、明暗双主题），数据由 GitHub Actions 每天定时抓取并重新生成，托管在 GitHub Pages 上即可长期自动运行。
 
 > 网站分为三大板块：**AI 科技** / **竞技体育** / **军事政治**，风格统一、可一键切换。
 
@@ -23,7 +23,7 @@
    cd ai-news-site
    git init
    git add .
-   git commit -m "init: 遥遥资讯"
+   git commit -m "init: 丫丫资讯"
    git branch -M main
    git remote add origin https://github.com/<你的用户名>/<仓库名>.git
    git push -u origin main
