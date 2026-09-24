@@ -28,10 +28,17 @@ HN_KEYWORDS = [
     "GPT", "OpenAI", "deep learning", "neural network", "transformer",
     "large language model", "diffusion model", "AI agent", "Claude", "Gemini",
 ]
-HN_PER_KW = 10
-HN_TOTAL = 14
-ARXIV_MAX = 8
-RSS_MAX_PER = 4
+HN_PER_KW = 12
+HN_TOTAL = 18
+PRODUCT_KEYWORDS = [
+    "AI tool", "GPT", "LLM", "machine learning", "open source AI",
+    "AI agent", "chatbot", "AI app", "diffusion", "vector database",
+]
+PRODUCT_PER_KW = 10
+ARXIV_MAX = 10
+RSS_MAX_PER = 8
+# 每个板块最终保留的条数上限（目标 20~30 区间）
+TARGET_PER_CAT = 28
 RSS_FEEDS = [
     ("The Verge AI", "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml"),
     ("Ars Technica", "http://feeds.arstechnica.com/arstechnica/index"),
@@ -60,6 +67,46 @@ REDDIT_MIL = [("worldnews", "world"), ("geopolitics", "politics"), ("military", 
 
 UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                     "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"}
+
+# 每日一句优美英文短句（按生成日期轮换，实现“每日更新一句”）
+DAILY_QUOTES = [
+    ("The best way to predict the future is to invent it.", "Alan Kay"),
+    ("Stay hungry, stay foolish.", "Steve Jobs"),
+    ("Simplicity is the ultimate sophistication.", "Leonardo da Vinci"),
+    ("What we think, we become.", "Buddha"),
+    ("Well done is better than well said.", "Benjamin Franklin"),
+    ("The only way to do great work is to love what you do.", "Steve Jobs"),
+    ("In the middle of difficulty lies opportunity.", "Albert Einstein"),
+    ("Do not go where the path may lead; go instead where there is no path.", "Ralph W. Emerson"),
+    ("Wisdom begins in wonder.", "Socrates"),
+    ("The future belongs to those who believe in the beauty of their dreams.", "Eleanor Roosevelt"),
+    ("Quality is not an act, it is a habit.", "Aristotle"),
+    ("Light tomorrow with today.", "Elizabeth Barrett Browning"),
+    ("We are what we repeatedly do.", "Aristotle"),
+    ("Nothing in life is to be feared, it is only to be understood.", "Marie Curie"),
+    ("A journey of a thousand miles begins with a single step.", "Lao Tzu"),
+    ("Dream big and dare to fail.", "Norman Vaughan"),
+    ("Creativity is intelligence having fun.", "Albert Einstein"),
+    ("The quieter you become, the more you are able to hear.", "Rumi"),
+    ("Make each day your masterpiece.", "John Wooden"),
+    ("Kindness is a language the deaf can hear and the blind can see.", "Mark Twain"),
+    ("Whatever you can do, begin it. Boldness has genius in it.", "Goethe"),
+    ("The secret of getting ahead is getting started.", "Mark Twain"),
+    ("Happiness is not something ready-made. It comes from your own actions.", "Dalai Lama"),
+    ("To love what you do and feel that it matters — how could anything be more fun?", "Katharine Graham"),
+    ("Overflowing with quiet joy, the mind becomes luminous.", "Buddhist Saying"),
+    ("Peace comes from within. Do not seek it without.", "Buddha"),
+    ("The beautiful thing about learning is that no one can take it away.", "B.B. King"),
+    ("Turn your face to the sun and the shadows fall behind you.", "Maori Proverb"),
+    ("Small steps every day lead to big changes over time.", "Anonymous"),
+    ("A calm mind is the ultimate weapon against life's storms.", "Naval Ravikant"),
+]
+
+def pick_daily_quote():
+    """按当前日期（一年中的第几天）稳定选取当日短句，实现每日更新一句。"""
+    doy = (datetime.now(timezone.utc)).timetuple().tm_yday
+    q, a = DAILY_QUOTES[doy % len(DAILY_QUOTES)]
+    return q, a
 
 
 # ----------------------------- 抓取工具 -----------------------------
@@ -149,37 +196,41 @@ def fetch_hn():
     return lst[:HN_TOTAL]
 
 
-def fetch_arxiv():
-    try:
-        url = ("http://export.arxiv.org/api/query?search_query=cat:cs.AI"
-               "+OR+cat:cs.CL+OR+cat:cs.LG"
-               f"&sortBy=submittedDate&sortOrder=descending&max_results={ARXIV_MAX}")
-        xml = fetch_text(url)
-        import xml.etree.ElementTree as ET
-        ns = {"a": "http://www.w3.org/2005/Atom"}
-        root = ET.fromstring(xml)
-        out = []
-        for e in root.findall("a:entry", ns):
-            title = clean(e.findtext("a:title", namespaces=ns))
-            summary = clean(e.findtext("a:summary", namespaces=ns))
-            published = e.findtext("a:published", namespaces=ns)
-            link = e.findtext("a:id", namespaces=ns)
-            authors = [a.findtext("a:name", namespaces=ns)
-                       for a in e.findall("a:author", ns)][:3]
-            out.append({
-                "title": title,
-                "summary": summary,
-                "full": summary,
-                "url": link,
-                "source": "arXiv", "sub": "paper", "category": "ai",
-                "points": 0, "comments": 0,
-                "author": ", ".join([a for a in authors if a]),
-                "published": published,
-            })
-        return out
-    except Exception as e:
-        print(f"  [arXiv] 抓取失败: {e}", file=sys.stderr)
-        return []
+def fetch_hn_products():
+    """抓取 Hacker News 的 show_hn（AI 产品 / 工具发布），作为 AI 科技下的「产品」栏目。"""
+    items = {}
+    for kw in PRODUCT_KEYWORDS:
+        try:
+            q = urllib.parse.quote(kw)
+            url = (f"https://hn.algolia.com/api/v1/search?query={q}"
+                   f"&tags=story,show_hn&hitsPerPage={HN_PER_KW}")
+            data = fetch_json(url)
+            for h in data.get("hits", []):
+                oid = h.get("objectID")
+                if not oid or oid in items:
+                    continue
+                title = h.get("title") or h.get("story_title")
+                if not title:
+                    continue
+                link = h.get("url") or f"https://news.ycombinator.com/item?id={oid}"
+                pts = h.get("points") or 0
+                cms = h.get("num_comments") or 0
+                items[oid] = {
+                    "title": clean(title),
+                    "summary": f"AI 产品 / 工具新发布，HN 社区热度 ▲{pts} · 💬{cms}。",
+                    "full": (f"这是 Hacker News Show HN 上分享的 AI 产品 / 工具，"
+                             f"获得 {pts} 赞、{cms} 条评论。\n\n原标题：{clean(title)}"),
+                    "url": link,
+                    "source": "Hacker News · Show HN", "sub": "product", "category": "ai",
+                    "points": pts, "comments": cms,
+                    "author": h.get("author") or "",
+                    "published": h.get("created_at"),
+                }
+        except Exception as e:
+            print(f"  [HN 产品] 关键词 '{kw}' 抓取失败: {e}", file=sys.stderr)
+    lst = list(items.values())
+    lst.sort(key=lambda x: (x["points"] or 0), reverse=True)
+    return lst[:HN_TOTAL]
 
 
 def fetch_rss():
@@ -349,12 +400,12 @@ def is_cjk(s):
 
 
 def translate_item(it):
-    """逐字段翻译：英文内容译为中文，中文内容原样保留（避免中英混排导致漏译）。"""
+    """翻译标题与摘要（可见的双语内容）；正文保持英文原文（用户要求英文保留）。
+    已含中文的字段原样保留，避免中英混排导致漏译。"""
     it["title_zh"] = translate_en_zh(it.get("title", ""))
     it["summary_zh"] = (translate_en_zh(it.get("summary", ""))
                         if not is_cjk(it.get("summary", "")) else it.get("summary", ""))
-    it["full_zh"] = (translate_en_zh(it.get("full", ""))
-                     if not is_cjk(it.get("full", "")) else it.get("full", ""))
+    it["full_zh"] = it.get("full", "")  # 正文保留英文
     return it
 
 
@@ -369,11 +420,11 @@ SAMPLE_AI = [
         "published": (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat(),
     },
     {
-        "title": "示例：arXiv 论文 — 高效稀疏注意力机制综述",
-        "summary": "A survey on efficient sparse attention for long-context large language models.",
-        "full": "A survey on efficient sparse attention for long-context large language models. We systematically review recent advances in sparse attention that reduce the quadratic cost of standard transformers, enabling context lengths of hundreds of thousands of tokens while preserving model quality across downstream tasks.",
-        "url": "https://arxiv.org", "source": "arXiv", "sub": "paper", "category": "ai",
-        "points": 0, "comments": 0, "author": "Demo Authors",
+        "title": "示例：Show HN — 一款本地运行的轻量级 AI 写作助手",
+        "summary": "AI 产品 / 工具新发布，HN 社区热度 ▲642 · 💬88。",
+        "full": "这是 Hacker News Show HN 上分享的 AI 产品 / 工具，获得 642 赞、88 条评论。\n\n原标题：Show HN: A lightweight locally-running AI writing assistant",
+        "url": "https://github.com", "source": "Hacker News · Show HN", "sub": "product", "category": "ai",
+        "points": 642, "comments": 88, "author": "demo",
         "published": (datetime.now(timezone.utc) - timedelta(hours=5)).isoformat(),
     },
     {
@@ -460,56 +511,122 @@ def process(items):
     return [{k: v for k, v in it.items() if k != "_dt"} for it in items]
 
 
-def main():
-    OFFLINE = os.environ.get("OFFLINE")
-    if OFFLINE:
-        print("→ 离线模式：使用内置示例数据（跳过网络抓取与翻译）。")
-        ai, sports, mil = SAMPLE_AI, SAMPLE_SPORTS, SAMPLE_MIL
-    else:
-        print("→ 正在抓取 AI 科技资讯 ...")
-        ai = fetch_hn() + fetch_arxiv() + fetch_rss()
-        if not ai:
-            print("! AI 在线源不可用，使用离线兜底数据。", file=sys.stderr)
-            ai = SAMPLE_AI
+def balance(items, caps, total):
+    """按 sub 配额取数，保证每个子栏目都有内容；不足配额的部分再用最新条目补齐。
+    items 需已按时间倒序排列。"""
+    counts = {}
+    out = []
+    for it in items:
+        s = it["sub"]
+        cap = caps.get(s, 10**9)
+        if counts.get(s, 0) < cap:
+            out.append(it); counts[s] = counts.get(s, 0) + 1
+        if len(out) >= total:
+            break
+    if len(out) < total:
+        seen = {id(x) for x in out}
+        for it in items:
+            if id(it) not in seen:
+                out.append(it)
+            if len(out) >= total:
+                break
+    return out
 
-        print("→ 正在抓取竞技体育资讯 ...")
-        sports = fetch_sports_rss() + fetch_reddit_sports()
-        if not sports:
-            print("! 体育在线源不可用，使用离线兜底数据。", file=sys.stderr)
-            sports = SAMPLE_SPORTS
 
-        print("→ 正在抓取军事政治资讯 ...")
-        mil = fetch_military() + fetch_reddit_mil()
-        if not mil:
-            print("! 军事政治在线源不可用，使用离线兜底数据。", file=sys.stderr)
-            mil = SAMPLE_MIL
+RAW_FILE = "items_raw.json"
 
-    ai = process(ai)
-    sports = process(sports)
-    mil = process(mil)
+def fetch_all():
+    """抓取三类资讯（真实源）；任一为空时回退到示例数据。"""
+    print("→ 正在抓取 AI 科技资讯 ...")
+    ai = fetch_hn() + fetch_hn_products() + fetch_rss()
+    if not ai:
+        print("! AI 在线源不可用，使用离线兜底数据。", file=sys.stderr); ai = SAMPLE_AI
+    print("→ 正在抓取竞技体育资讯 ...")
+    sports = fetch_sports_rss() + fetch_reddit_sports()
+    if not sports:
+        print("! 体育在线源不可用，使用离线兜底数据。", file=sys.stderr); sports = SAMPLE_SPORTS
+    print("→ 正在抓取军事政治资讯 ...")
+    mil = fetch_military() + fetch_reddit_mil()
+    if not mil:
+        print("! 军事政治在线源不可用，使用离线兜底数据。", file=sys.stderr); mil = SAMPLE_MIL
+    ai = balance(process(ai), {"news": 12, "product": 10, "media": 6}, TARGET_PER_CAT)
+    sports = balance(process(sports), {"soccer": 12, "basketball": 8, "general": 8}, TARGET_PER_CAT)
+    mil = balance(process(mil), {"world": 12, "politics": 8, "military": 8}, TARGET_PER_CAT)
+    return ai, sports, mil
 
-    print("→ 正在生成中文翻译（保留英文原文）...")
-    for it in ai + sports + mil:
-        try:
-            translate_item(it)
-        except Exception as e:
-            print(f"  [翻译跳过] {it.get('title','')[:30]}: {e}", file=sys.stderr)
-        time.sleep(0.12)
+def save_raw(ai, sports, mil):
+    with open(RAW_FILE, "w", encoding="utf-8") as f:
+        json.dump({"ai": ai, "sports": sports, "mil": mil}, f, ensure_ascii=False)
 
+def load_raw():
+    with open(RAW_FILE, encoding="utf-8") as f:
+        d = json.load(f)
+    return d["ai"], d["sports"], d["mil"]
+
+def translate_items(ai, sports, mil, checkpoint=True):
+    """逐条翻译；已译（含 title_zh）跳过。checkpoint=True 时每完成一条即落盘，可断点续译。"""
+    groups = [("AI", ai), ("体育", sports), ("军事", mil)]
+    total = sum(len(g[1]) for g in groups)
+    done0 = sum(1 for g in groups for it in g[1] if it.get("title_zh"))
+    print(f"→ 翻译进度 {done0}/{total}，开始续译 ...")
+    for _label, items in groups:
+        for it in items:
+            if it.get("title_zh"):
+                continue
+            try:
+                translate_item(it)
+            except Exception as e:
+                print(f"  [翻译跳过] {it.get('title','')[:30]}: {e}", file=sys.stderr)
+            time.sleep(0.12)
+            if checkpoint:
+                save_raw(ai, sports, mil)
+    return ai, sports, mil
+
+def build_html(ai, sports, mil):
     data = {
         "generated_at": datetime.now(timezone(timedelta(hours=8))).isoformat(),
         "ai": {"count": len(ai), "items": ai},
         "sports": {"count": len(sports), "items": sports},
         "mil": {"count": len(mil), "items": mil},
     }
-
     safe = (json.dumps(data, ensure_ascii=False)
             .replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026"))
-    out_html = HTML_TEMPLATE.replace("__DATA_JSON__", safe)
-
+    q, qa = pick_daily_quote()
+    out_html = (HTML_TEMPLATE
+                .replace("__DATA_JSON__", safe)
+                .replace("__DAILY_QUOTE__", q)
+                .replace("__DAILY_AUTHOR__", qa))
     with open("index.html", "w", encoding="utf-8") as f:
         f.write(out_html)
     print(f"✓ 已生成 index.html（AI 科技 {len(ai)} 条 · 竞技体育 {len(sports)} 条 · 军事政治 {len(mil)} 条）")
+
+def main():
+    MODE = os.environ.get("MODE", "").lower()
+    OFFLINE = os.environ.get("OFFLINE")
+    if OFFLINE:
+        print("→ 离线模式：使用内置示例数据。")
+        ai, sports, mil = SAMPLE_AI, SAMPLE_SPORTS, SAMPLE_MIL
+        ai = process(ai)[:TARGET_PER_CAT]; sports = process(sports)[:TARGET_PER_CAT]; mil = process(mil)[:TARGET_PER_CAT]
+        translate_items(ai, sports, mil, checkpoint=False)
+        build_html(ai, sports, mil)
+        return
+    if MODE == "fetch":
+        ai, sports, mil = fetch_all()
+        save_raw(ai, sports, mil)
+        print(f"✓ 已抓取并保存原始数据（AI {len(ai)} · 体育 {len(sports)} · 军事 {len(mil)}）")
+        return
+    if MODE == "translate":
+        ai, sports, mil = load_raw()
+        translate_items(ai, sports, mil, checkpoint=True)
+        return
+    if MODE == "build":
+        ai, sports, mil = load_raw()
+        build_html(ai, sports, mil)
+        return
+    # 默认（GitHub Actions）：一次跑完
+    ai, sports, mil = fetch_all()
+    translate_items(ai, sports, mil, checkpoint=False)
+    build_html(ai, sports, mil)
 
 
 # ----------------------------- 页面模板 (iOS 风格) -----------------------------
@@ -558,22 +675,31 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   }
   @media (prefers-color-scheme: dark){ .nav{background:rgba(0,0,0,.72);} }
   .nav-in{max-width:680px;margin:0 auto;padding:10px 16px;
-    display:flex;align-items:center;justify-content:space-between;}
-  .nav-title{font-weight:700;font-size:17px;letter-spacing:.3px;}
-  .nav-up{font-size:12px;color:var(--sub);display:flex;align-items:center;gap:6px;}
+    display:flex;align-items:center;justify-content:space-between;gap:12px;}
+  .nav-title{font-weight:800;font-size:17px;letter-spacing:.3px;white-space:nowrap;
+    background:linear-gradient(120deg,#ff9a00,#ff6a00 55%,#ffb84d);
+    -webkit-background-clip:text;background-clip:text;color:transparent;}
+  .nav-right{margin-left:auto;display:flex;align-items:center;gap:14px;min-width:0;}
+  .nav-up{font-size:12px;color:var(--sub);display:flex;align-items:center;gap:6px;white-space:nowrap;}
   .dot{width:7px;height:7px;border-radius:50%;background:var(--media);
     box-shadow:0 0 0 0 rgba(52,199,89,.6);animation:pulse 2s infinite;}
   @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(52,199,89,.5);}70%{box-shadow:0 0 0 7px rgba(52,199,89,0);}100%{box-shadow:0 0 0 0 rgba(52,199,89,0);}}
 
-  /* 头部 */
-  .hero{padding:26px 0 4px;}
-  .hero h1{
-    margin:0;font-size:34px;font-weight:800;letter-spacing:-.5px;
-    background:linear-gradient(120deg,#ff9a00,#ff6a00 55%,#ffb84d);
-    -webkit-background-clip:text;background-clip:text;color:transparent;
+  /* 头部每日一句优美英文短句（上方） */
+  .hero-quote{
+    text-align:left;
+    font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    font-style:italic;font-size:27px;line-height:1.55;color:var(--text);letter-spacing:.4px;
+    display:flex;flex-direction:column;align-items:flex-start;gap:7px;
   }
-  .hero .date{margin-top:4px;color:var(--sub);font-size:14px;}
-  .hero .cnt{color:var(--accent);font-weight:600;}
+  .hero-quote .qtxt{opacity:.95;}
+  .hero-quote .qtxt .mark{color:var(--accent);font-style:normal;font-weight:700;font-size:30px;line-height:0;}
+  .hero-quote .qby{font-size:14px;font-style:normal;opacity:.6;letter-spacing:.6px;}
+
+  /* 头部 */
+  .hero{padding:30px 0 6px;display:flex;flex-direction:column;gap:14px;}
+  .hero .date{color:var(--sub);font-size:17px;font-weight:500;}
+  .hero .cnt{color:var(--accent);font-weight:700;}
 
   /* 分段控制器 */
   .seg{
@@ -613,6 +739,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   .badge .bdot{width:7px;height:7px;border-radius:50%;background:var(--accent);}
   .badge.news{background:rgba(255,149,0,.14);color:var(--news);} .badge.news .bdot{background:var(--news);}
   .badge.paper{background:rgba(94,92,230,.16);color:var(--paper);} .badge.paper .bdot{background:var(--paper);}
+  .badge.product{background:rgba(94,92,230,.16);color:var(--paper);} .badge.product .bdot{background:var(--paper);}
   .badge.media{background:rgba(52,199,89,.16);color:var(--media);} .badge.media .bdot{background:var(--media);}
   .badge.sports{background:rgba(255,59,48,.15);color:var(--sport);} .badge.sports .bdot{background:var(--sport);}
   .badge.mil{background:rgba(48,176,199,.16);color:var(--mil);} .badge.mil .bdot{background:var(--mil);}
@@ -653,13 +780,18 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   <div class="nav">
     <div class="nav-in">
       <div class="nav-title">遥遥资讯</div>
-      <div class="nav-up"><span class="dot"></span><span id="upd">更新中…</span></div>
+      <div class="nav-right">
+        <div class="nav-up"><span class="dot"></span><span id="upd">更新中…</span></div>
+      </div>
     </div>
   </div>
 
   <div class="wrap">
     <div class="hero">
-      <h1>遥遥资讯</h1>
+      <div class="hero-quote">
+        <span class="qtxt"><span class="mark">“</span>__DAILY_QUOTE__<span class="mark">”</span></span>
+        <span class="qby">— __DAILY_AUTHOR__</span>
+      </div>
       <div class="date" id="herodate">—</div>
     </div>
 
@@ -714,7 +846,7 @@ const CATS = {
     label: "AI 科技",
     tabs: [
       {f:"all", label:"全部"}, {f:"news", label:"资讯"},
-      {f:"paper", label:"论文"}, {f:"media", label:"媒体"}
+      {f:"product", label:"产品"}, {f:"media", label:"媒体"}
     ]
   },
   sports: {
@@ -745,7 +877,7 @@ let sub = "all";
 function updateHero(){
   const c = (DATA[cat] && DATA[cat].count) || 0;
   document.getElementById("herodate").innerHTML =
-    fmtDate(new Date()) + " · " + CATS[cat].label + " 收录 <span class='cnt'>" + c + "</span> 条";
+    fmtDate(new Date()) + " · " + CATS[cat].label + " 收录国内外最新资讯 <span class='cnt'>" + c + "</span> 条";
 }
 
 // 渲染卡片
