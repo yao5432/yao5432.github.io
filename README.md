@@ -1,16 +1,19 @@
-# AI 资讯日报 · iOS 风格自动更新网站
+# 遥遥资讯 · iOS 风格自动更新网站
 
-一个**纯静态、零成本、每日自动更新**的 AI 资讯聚合站。整体采用 iOS 设计语言（毛玻璃导航、分段控制器、圆角卡片、明暗双主题），数据由 GitHub Actions 每天定时抓取并重新生成，托管在 GitHub Pages 上即可长期自动运行。
+一个**纯静态、零成本、每日自动更新**的资讯聚合站（遥遥资讯）。整体采用 iOS 设计语言（毛玻璃导航、分段控制器、圆角卡片、明暗双主题），数据由 GitHub Actions 每天定时抓取并重新生成，托管在 GitHub Pages 上即可长期自动运行。
+
+> 网站分为三大板块：**AI 科技** / **竞技体育** / **军事政治**，风格统一、可一键切换。
 
 ## ✨ 特性
 
 - **每日自动更新**：GitHub Actions 定时运行 `generate.py`，抓取最新内容并提交，GitHub Pages 自动生效。
-- **多源聚合**（均无需 API Key）：
-  - Hacker News — 热门 AI 讨论（按热度排序）
-  - arXiv — cs.AI / cs.CL / cs.LG 最新论文
-  - 科技媒体 RSS — The Verge / Ars Technica / Wired（可选，需 `feedparser`）
-- **iOS 视觉**：毛玻璃导航栏、渐变标题、分段筛选（全部 / 资讯 / 论文 / 媒体）、卡片悬浮动效、明暗自适应。
-- **零依赖核心**：仅用 Python 标准库即可生成；`feedparser` 为可选增强。
+- **三大板块 · 多源聚合**（均无需 API Key）：
+  - **AI 科技**：Hacker News（热门 AI 讨论，按热度排序）、arXiv（cs.AI / cs.CL / cs.LG 最新论文）、科技媒体 RSS（The Verge / Ars Technica / Wired）
+  - **竞技体育**：ESPN 各项目 RSS（足球 / NBA / NFL / MLB / 网球）、BBC Sport 综合资讯、Reddit 体育社区（补充）
+  - **军事政治**：BBC 国际 / 政治、Al Jazeera、Google News（military / defense / geopolitics / election）等 RSS
+- **中英双语**：保留英文原文，下方自动附中文翻译（生成时调用免费翻译接口，中文内容原样保留）。
+- **iOS 视觉**：毛玻璃导航栏、渐变标题、一级板块切换（AI 科技 / 竞技体育 / 军事政治）+ 二级分段筛选、卡片悬浮动效、明暗自适应。
+- **零依赖核心**：仅用 Python 标准库即可生成；`feedparser` 为必需依赖（用于全部 RSS 抓取）。
 - **安全渲染**：页面用 `textContent` 构建 DOM，并对数据做转义，避免 XSS。
 
 ## 🚀 部署到 GitHub Pages（5 分钟）
@@ -20,7 +23,7 @@
    cd ai-news-site
    git init
    git add .
-   git commit -m "init: AI 资讯日报"
+   git commit -m "init: 遥遥资讯"
    git branch -M main
    git remote add origin https://github.com/<你的用户名>/<仓库名>.git
    git push -u origin main
@@ -44,9 +47,11 @@ python -m http.server 8000
 
 ### 自定义
 
-- **抓取关键词**：修改 `generate.py` 顶部的 `HN_KEYWORDS`。
+- **AI 抓取关键词**：修改 `generate.py` 顶部的 `HN_KEYWORDS`。
 - **各源条数**：调整 `HN_TOTAL` / `ARXIV_MAX` / `RSS_MAX_PER`。
-- **媒体源**：编辑 `RSS_FEEDS` 列表（加 `feedparser` 支持任意 RSS）。
+- **AI 媒体源**：编辑 `RSS_FEEDS` 列表（加 `feedparser` 支持任意 RSS）。
+- **体育源**：编辑 `SPORTS_RSS_FEEDS` 列表（ESPN 各项目 RSS 或任意体育 RSS）。
+- **军事政治源**：编辑 `MIL_RSS_FEEDS` 列表（BBC / Al Jazeera / Google News 等 RSS）。
 - **更新时间**：编辑 `.github/workflows/daily.yml` 中的 cron 表达式（UTC 时间）。
 - **配色**：修改 `generate.py` 中 `HTML_TEMPLATE` 顶部的 CSS 变量（`--accent` 等）。
 
